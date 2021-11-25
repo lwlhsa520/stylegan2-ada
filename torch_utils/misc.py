@@ -103,6 +103,54 @@ def profiled_function(fn):
     return decorator
 
 #----------------------------------------------------------------------------
+# Sampler for torch.utils.data.DataLoader that loop over the dataset
+# shuffle = True
+# if first batch, get overall random batch,
+# else if not , get transaction_radio a, the new batch is composed by  (a * batch_size)  random or the top old batch part  and  (1 - a) * batch_size random new batch part
+# the weights of data play a great role in random sample
+
+
+#----------------------------------------------------------------------------
+# trancation  batch
+
+class TrancBatchSampler(torch.utils.data.Sampler):
+    r"""Wraps another sampler to yield a mini-batch of indices."""
+    def __init__(self, sampler, batch_size, drop_last, is_truncation=False, truncation_psi=0.6):
+        # ...省略类型检查
+        # 定义使用何种采样器Sampler
+        self.sampler = sampler
+        self.batch_size = batch_size
+        self.istranc = is_truncation
+        self.last_batch = None
+        self.tranc_len = int(batch_size * truncation_psi) if is_truncation else batch_size
+
+        # 是否在采样个数小于batch_size时剔除本次采样
+        self.drop_last = drop_last
+    def __iter__(self):
+        batch = []
+        for idx in self.sampler:
+            batch.append(idx)
+            # 如果采样个数和batch_size相等则本次采样完成
+            if len(batch) == self.batch_size:
+                self.last_batch = batch
+                yield batch
+                batch = [] if self.last_batch is None else self.last_batch[self.tranc_len:]
+                #print("trancction length ", self.tranc_len)
+
+        # for结束后在不需要剔除不足batch_size的采样个数时返回当前batch
+        if len(batch) > 0 and not self.drop_last:
+            yield batch
+    def __len__(self):
+        # 在不进行剔除时，数据的长度就是采样器索引的长度
+        if self.drop_last:
+            return len(self.sampler) // self.batch_size
+        else:
+            return (len(self.sampler) + self.batch_size - 1) // self.batch_size
+
+
+
+
+#----------------------------------------------------------------------------
 # Sampler for torch.utils.data.DataLoader that loops over the dataset
 # indefinitely, shuffling items as it goes.
 
