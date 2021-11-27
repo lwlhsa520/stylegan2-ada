@@ -134,10 +134,11 @@ def training_loop(
     if rank == 0:
         print('Loading training set...')
     training_set = dnnlib.util.construct_class_by_name(**training_set_kwargs) # subclass of training.dataset.Dataset
-    training_set_sampler = misc.InfiniteSampler(dataset=training_set, rank=rank, num_replicas=num_gpus, seed=random_seed)
-    training_set_batch_sampler = misc.TrancBatchSampler(training_set_sampler, batch_size=batch_size, drop_last=False,
+    #training_set_sampler = misc.InfiniteSampler(dataset=training_set, rank=rank, num_replicas=num_gpus, seed=random_seed)
+    random_sampler = torch.utils.data.RandomSampler(data_source = training_set)
+    training_set_batch_sampler = misc.TrancBatchSampler(random_sampler, batch_size=batch_size//num_gpus, drop_last=False,
                                                    is_truncation=True, truncation_psi=0.6)
-    training_set_iterator = iter(torch.utils.data.DataLoader(dataset=training_set, sampler=training_set_sampler, batch_size=batch_size//num_gpus, **data_loader_kwargs))
+    training_set_iterator = iter(torch.utils.data.DataLoader(dataset=training_set, batch_sampler=training_set_batch_sampler, **data_loader_kwargs))
     if rank == 0:
         print()
         print('Num images: ', len(training_set))
